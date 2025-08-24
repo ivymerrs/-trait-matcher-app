@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>亲子特质匹配（LeanCloud 协作版）</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React 18 UMD -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel for JSX in the browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- LeanCloud JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/leancloud-storage@4.15.0/dist/av-min.js"></script>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, "Apple Color Emoji", "Segoe UI Emoji"; }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // 亲子特质匹配完整数据（与现有项目保持一致）
+    // 数据结构：data[parentTrait][childTrait] = { type, score, reason }
+    const allPublicMatches = {
+      "E1": {"E1": { type: "同类型共鸣", score: 90, reason: "父母与孩子都高度重视规则、秩序和高效学习。这种相似性使得他们能够天然理解和支持彼此的学习与生活方式，形成高效共鸣。但过度追求秩序也可能导致关系僵化，缺乏灵活性，当一方的行为稍有偏离时，就可能产生微小的摩擦和不解。" },"E2": { type: "互补型滋养", score: 80, reason: "父母的系统性可以为孩子超前的想法和内向的个性提供稳定的框架和安全感，让孩子可以在有序环境中发展创新思维。然而，父母的理性逻辑也可能无意中忽略孩子内敛的情感世界，让孩子感到某些情感需求不被理解或重视。" },"E3": { type: "冲突型挑战", score: 25, reason: "父母与孩子都追求掌控和秩序。父母倾向于建立规则并要求遵守，而孩子则希望自己来掌控秩序。这导致了持续的权力斗争和冲突。这种僵持可能让亲子关系变得非常紧张，双方都难以妥协。" },"E4": { type: "互补型滋养", score: 85, reason: "父母的系统性可以帮助孩子将天马行空的创意和冲动的行动力引导到一条有结构的道路上，从而将潜能转化为实际成果。但如果父母的规则过于死板，可能会限制孩子天性的自由探索和即兴发挥，让孩子感到被束缚。" },"E5": { type: "冲突型挑战", score: 15, reason: "父母的理性思维和对系统的重视，与孩子对情感联结和社交的强烈需求直接冲突。父母可能会无意中将孩子的情感表达视为“不理性”而加以压制或忽略，导致孩子感到情感不被理解和接纳，关系难以亲密。" },"E6": { type: "同类型共鸣", score: 90, reason: "父母与孩子都具备高效的学习和思维能力。他们能够互相理解彼此的学习模式，形成一种高效且富有成效的共鸣关系。然而，这种高相似性也可能导致亲子关系变成一场持续的智力“竞赛”，让孩子感到压力，害怕达不到父母的期望。" },"E7": { type: "同类型共鸣", score: 85, reason: "父母的系统性与孩子的务实谨慎相辅相成。他们都重视规划和风险控制，这为孩子提供了极大的安全感，帮助其稳健发展。但如果双方都过于谨慎和规避风险，可能会导致生活缺乏新意和乐趣，关系显得过于严肃和刻板。" },"E8": { type: "冲突型挑战", score: 10, reason: "这是最典型的冲突。父母的“系统”与孩子追求的“自由”和“变化”完全对立。父母的规则会被孩子视为无情的束缚，导致孩子的天赋和探索精神被严重压制，关系难以建立信任和理解。" },"E9": { type: "互补型滋养", score: 75, reason: "父母提供的有序和稳定的环境，恰好能满足孩子进行深度内省和高度专注的需求，使其可以心无旁骛地发展其思考天赋。但父母可能会倾向于要求孩子将内心的思考结果外显化，如果无法看到具体成果，可能会对孩子施加无形压力。" },"E10": { type: "同类型共鸣", score: 85, reason: "父母与孩子都具备逻辑思维和技术专长。他们能够共同探讨和解决问题，形成一种基于专业和理性的深度共鸣。然而，这种共同点也可能导致双方过于专注于技术和效率，而忽略了情感交流和亲密联结的重要性。" },"E11": { type: "冲突型挑战", score: 20, reason: "父母的系统和理性，与孩子对深层情感联结的渴求产生冲突。父母可能会将孩子的情感需求视为不理性的“麻烦”，导致孩子感到不被理解和重视，最终可能选择关闭自己的情感世界。" },"E12": { type: "互补型滋养", score: 70, reason: "父母的系统性和稳定性为孩子提供了安全的港湾，使其温和随性的天性不会因外部世界的混乱而感到焦虑。但父母对效率和规划的重视，也可能让孩子感到被催促，无法按自己的节奏生活，从而感到压力和不适。" }},
+      "E2": {"E1": { type: "互补型滋养", score: 75, reason: "父母的内向和创新思维能鼓励孩子探索内心世界和新想法，弥补其过度依赖外部肯定的短板。父母不善于情感外露，但能理解孩子对秩序的需求，提供一个安静、稳定的环境。但是，父母的内在世界与E1孩子对外部认可的追求形成鲜明对比。父母可能无法理解孩子对“完美”的追求和对外部评价的恐惧，导致沟通上的隔阂。" },"E2": { type: "同类型共鸣", score: 90, reason: "父母和孩子都内向且富有创意，能互相理解，建立深度的精神联结。他们共同的世界可能充满新奇的想法和深刻的洞察。然而，双方都沉浸在自己的独特思维世界中，可能忽略了对彼此的情感表达和外部的实际需求，导致家庭生活缺乏实际的联结感和秩序。当莫名心烦和无名怒火爆发时，由于都难以理解对方的行为，可能无法有效沟通，导致冲突被压抑并持续积累，让关系变得复杂和疏离。" },"E3": { type: "冲突型挑战", score: 15, reason: "父母的内敛和对独立空间的需求，与孩子强大的掌控欲和外在行动力直接冲突。孩子可能会觉得父母软弱、缺乏方向，而父母则感到孩子过于强势、压迫。" },"E4": { type: "互补型滋养", score: 80, reason: "父母的深度创新思维可以为孩子天马行空的创意提供理论基础和深度洞察。父母能为孩子提供一个安静思考的港湾。但是，父母可能会因为孩子的冒险行为而过度担忧，并试图用情感来“绑架”孩子，从而束缚孩子的自由和探索欲。父母不善于制定规则，这可能让孩子缺乏边界感，导致行为变得更加冲动和无序。" },"E5": { type: "互补型滋养", score: 70, reason: "孩子的情感外放可以弥补父母的情感内敛，帮助父母更好地表达自己。父母可以帮助孩子进行深度思考，而不仅仅停留在表面社交。但是，孩子的情感外放与父母的内向之间存在冲突。孩子可能会觉得父母过于冷漠和缺乏情感表达，而父母则可能觉得孩子过于情绪化和难以理解。" },"E6": { type: "同类型共鸣", score: 85, reason: "父母和孩子都思维活跃、敏捷，能进行深入的智力交流。他们都倾向于用思维来解决问题，互相理解。但是，双方都可能因为过于敏感而选择逃避冲突，导致问题无法被有效解决，长期积累成为隐患。" },"E7": { type: "互补型滋养", score: 70, reason: "父母的创新思维能拓宽孩子务实谨慎的视野，鼓励他们思考除了财富和安全之外的更多可能性。孩子的务实能给父母提供稳定的现实基础。" },"E8": { type: "同类型共鸣（有挑战）", score: 65, reason: "父母和孩子都拥有发散型思维和探索精神，能互相启发。但父母的内向可能无法跟上孩子的外向探索，导致孩子觉得父母缺乏活力。" },"E9": { type: "同类型共鸣", score: 90, reason: "父母和孩子都内向且擅长深度思考，能互相理解彼此的内心世界。这种匹配非常舒适，能形成深度的精神联结。然而，父母的独特思维和有时令人费解的行为，可能会让追求完美和内省的孩子感到不安或困惑。当父母的情绪波动（莫名心烦和无名怒火）爆发时，高度专注且固执己见的孩子可能会因为不理解而感到被打扰，甚至将其视为对自身内心世界的入侵，导致他们退缩或产生更强的孤立感。" },"E10": { type: "冲突型挑战", score: 30, reason: "父母的内省与孩子的外在行动果敢形成对比。孩子可能觉得父母缺乏行动力，而父母则觉得孩子过于冲动，难以进行深入交流。" },"E11": { type: "冲突型挑战", score: 20, reason: "父母的情感内敛与孩子对强烈情感链接的渴望形成巨大冲突。孩子可能会感到不被爱、不被理解，而父母则感到孩子的情感需求过于强烈。" },"E12": { type: "同类型共鸣", score: 80, reason: "父母和孩子都内向且温和，能互相尊重彼此的独立空间。这种匹配关系平静而和谐，充满理解。然而，父母有时会莫名爆发的情绪（无名怒火），可能会让温和随性的孩子感到困惑和不安。由于孩子习惯避免冲突，他们可能会选择逃避或压抑自己的感受，而无法理解和回应父母的情绪，导致亲子关系表面平静，实则缺乏深层的情感交流。" }},
+      "E3": {"E1": { type: "同类型共鸣", score: 80, reason: "父母的果断掌控与E1孩子的好面子特质相互影响。父母能够为孩子提供清晰的规则和结构，帮助他们高效达成目标，从而在外界赢得尊重。然而，父母的强势也可能让孩子感到被过度控制，导致孩子为了维护表面的和谐而压抑真实想法，难以获得真正的内心自主性。" },"E2": { type: "互补型滋养", score: 80, reason: "父母的秩序感能为孩子内向的创新思维提供一个稳定且受保护的环境，使其可以在这个框架内安全地进行探索。然而，由于孩子习惯将所有情绪和想法都闷在心里，父母的理性逻辑可能会无意中忽略这些内敛的情感世界，让孩子感到某些需求不被理解或重视。" },"E3": { type: "冲突型挑战", score: 10, reason: "这是最激烈的冲突。父母和孩子都具备极强的掌控欲，导致持续的权力斗争和摩擦。双方都试图主导，最终可能两败俱伤。" },"E4": { type: "冲突型挑战", score: 20, reason: "父母的秩序感与孩子的天性冲动和创新精神直接对立。父母会试图用规则来束缚孩子，而孩子则会反抗，导致亲子关系紧张。" },"E5": { type: "冲突型挑战", score: 35, reason: "父母的果断和务实可能难以理解和满足孩子对情感和联结的强烈需求。孩子可能会感到被忽略，情感无法得到有效回应。" },"E6": { type: "互补型滋养", score: 85, reason: "父母的担当和秩序感可以为孩子的天赋提供清晰的目标和结构，帮助他们将聪明才智落到实处，而非投机取巧。但如果父母过于强势，可能会与孩子喜欢“走捷径”、发牢骚的特质产生摩擦，导致权力斗争。父母对高效的追求也可能无意中忽略孩子因过度思考而产生的负面情绪，使关系变得紧张。" },"E7": { type: "同类型共鸣", score: 80, reason: "父母的担当和孩子的务实谨慎相辅相成。他们都重视结果和规划，能够共同建立一个稳定、可靠的生活基础。" },"E8": { type: "冲突型挑战", score: 15, reason: "父母的掌控欲与孩子对自由、变化的追求发生根本性冲突。父母的规则被孩子视为阻碍，孩子的探索精神被视为叛逆。" },"E9": { type: "互补型滋养", score: 75, reason: "父母提供的秩序和结构可以为孩子提供安全感，使其能够心无旁骛地进行深度思考和内省。但父母可能会倾向于要求孩子将内心的思考结果外显化，如果无法看到具体成果，可能会对孩子施加无形压力。" },"E10": { type: "互补型滋养", score: 85, reason: "父母的担当和果断为孩子的技术专精提供了清晰的目标和支持。他们能够理解孩子对精确性的追求，并共同解决问题。然而，这种共同点也可能导致双方过于专注于技术和效率，而忽略了情感交流和亲密联结的重要性。" },"E11": { type: "冲突型挑战", score: 25, reason: "父母的掌控倾向与孩子对深层情感联结的渴求产生冲突。孩子可能会感到关系被控制，而非自由流动的爱。" },"E12": { type: "互补型滋养", score: 90, reason: "父母的强大担当和掌控欲为孩子提供了坚实的保护。孩子温和随性的天性可以在父母的庇护下，安全无忧地发展。但父母对效率和规划的重视，也可能让孩子感到被催促，无法按自己的节奏生活，从而感到压力和不适。" }},
+      "E4": {"E1": { type: "互补型滋养", score: 75, reason: "父母的果敢和创新精神可以鼓励孩子打破规则束缚，勇于尝试新事物。父母是孩子走出舒适区的引路人，帮助其将天赋与实践相结合。但父母的冒险行为和不稳定可能让爱面子的孩子感到不安，因为这打破了他们习惯的秩序感，并可能让他们感到“失控”或“丢脸”。" },"E2": { type: "互补型滋养", score: 80, reason: "父母的行动力可以帮助内向的孩子将脑海中的创新想法付诸行动。父母是孩子将创意转化为现实的助推器。但父母的快节奏和外向可能无意中忽略了孩子的情感需求，让孩子感到不被理解或重视，无法找到一个可以安静内省的空间。" },"E3": { type: "冲突型挑战", score: 20, reason: "父母的创新和变化天性与孩子对规则、秩序和掌控的强烈需求直接冲突。父母的行为可能被孩子视为不负责任或无序，导致关系紧张。" },"E4": { type: "同类型共鸣", score: 90, reason: "父母和孩子都充满活力、勇于探索。他们能够互相理解彼此对新鲜事物的追求，共同成为生活的探险家。但双方都可能缺乏稳定性和规划，过于追求新奇和刺激，导致生活混乱或无法将想法付诸长期实践。" },"E5": { type: "互补型滋养", score: 80, reason: "父母的果敢可以为孩子提供强大的行动支持，帮助其实现情感上的愿望。父母也会鼓励孩子积极表达情感，而非被动等待。但过多的情感需求父母可能会难以理解，可能将孩子的情感需求视为不重要或“多愁善感”，从而无意中伤害到孩子。" },"E6": { type: "同类型共鸣", score: 85, reason: "父母的创新精神能够为孩子的高效学习提供丰富的灵感和实践机会。他们都注重解决问题和探索新知，能形成高效的学习伙伴关系。但父母的随性和不踏实可能与孩子爱走捷径的特点相互强化，导致基础不牢固。同时，父母的冒险行为可能会成为孩子“嘴碎”和抱怨的对象，而父母可能无法理解孩子陷入负面情绪的原因。" },"E7": { type: "冲突型挑战", score: 25, reason: "父母的冒险精神和孩子对风险的厌恶形成根本性冲突。父母的行动可能被孩子视为鲁莽，而孩子的谨慎则被父母视为畏缩不前。" },"E8": { type: "同类型共鸣", score: 85, reason: "父母和孩子都拥有强烈的探索欲和好奇心。他们能够共同体验和发现新事物，互相激发彼此的潜能。但这种高度的相似性可能导致双方都缺乏边界感和规则，生活过于自由散漫，难以形成稳定的家庭结构。" },"E9": { type: "互补型滋养", score: 75, reason: "父母的行动力可以为孩子的深度思考提供丰富的实践素材和应用场景。父母能帮助孩子将思考转化为实际的创新成果。但父母的快节奏和对外部世界的关注可能干扰孩子进行深度内省和高度专注，让他们感到被打扰或不被理解。" },"E10": { type: "互补型滋养", score: 85, reason: "父母的果敢可以为孩子的技术专长提供强大的行动支持和实践平台。他们能够共同将技术转化为现实世界的创新。但父母的冲动和不踏实可能与孩子对精确性的追求产生摩擦。" },"E11": { type: "互补型滋养", score: 70, reason: "父母的果敢和积极可以帮助孩子勇敢地建立社交联结，而非被动等待。父母能够鼓励孩子走出舒适区，主动寻求关系。但父母可能无法理解孩子对情感深度和安全感的渴求，他们的快节奏社交可能让孩子感到肤浅和不安。" },"E12": { type: "冲突型挑战", score: 30, reason: "父母的行动力和对变化的追求，可能让孩子感到巨大压力。孩子温和随性的天性可能被父母的快节奏生活所压制，感到不适。" }},
+      "E5": {"E1": { type: "冲突型挑战", score: 20, reason: "父母的感性与孩子对规则和逻辑的追求直接冲突。父母可能会认为孩子不近人情，而孩子则可能觉得父母的情绪化行为难以预测和理解，导致双方沟通困难。" },"E2": { type: "互补型滋养", score: 80, reason: "父母的温暖和情感支持能为孩子内向的创新世界提供安全和滋养。孩子可以安心地探索自己的想法，同时感受到来自父母的无条件接纳。然而，父母对情感表达的强烈需求，可能会让习惯情绪内隐的孩子感到被情感“绑架”或不知所措，从而选择退缩，导致双方都感到挫败。" },"E3": { type: "冲突型挑战", score: 15, reason: "父母的柔性与孩子对秩序和掌控的刚性需求完全对立。父母可能会感到被孩子支配，而孩子则可能觉得父母软弱、缺乏权威。" },"E4": { type: "冲突型挑战", score: 30, reason: "父母的感性与孩子强大的行动力之间存在脱节。父母可能会因担心孩子而过度干涉，而孩子则可能觉得父母的情感束缚阻碍了其探索的步伐。" },"E5": { type: "同类型共鸣", score: 95, reason: "父母和孩子都高度重视情感联结和人际关系。他们能够建立起极度亲密和共情的关系，彼此理解和支持，是理想的同类型匹配。然而，双方也可能过于依赖彼此的情感，形成一个封闭的“情感泡泡”，从而忽视外部世界的实际需求和更广阔的社交圈。当负面情绪出现时，也容易相互放大，导致情绪的恶性循环。" },"E6": { type: "互补型滋养", score: 85, reason: "父母的情感支持能为孩子高效学习提供强大的内在动力。孩子在感受到被爱和理解后，能够更专注于学业，而不会因为过于理性而变得僵化。然而，孩子的“嘴碎”和“易陷入负面情绪”的特质，可能会让父母感到心力交瘁，父母会试图用情感来解决孩子的问题，但孩子可能更偏向于陷入抱怨和思考的循环，导致亲子关系中的情感付出与回报失衡。" },"E7": { type: "冲突型挑战", score: 25, reason: "父母的感性与孩子对务实和风险的规避形成冲突。父母可能会觉得孩子缺乏情感表达，而孩子则觉得父母过于情绪化、不理智。" },"E8": { type: "互补型滋养", score: 80, reason: "父母的情感支持能为孩子大胆的探索提供坚实的后盾和安全感。孩子知道无论失败与否，都有一个温暖的港湾可以依靠。然而，父母对情感联结的强烈渴望，可能会被孩子视为一种束缚或过度依赖，从而感到不自在和压抑。" },"E9": { type: "互补型滋养", score: 75, reason: "父母的共情能力可以帮助孩子更好地表达内心的想法和情感。父母能理解孩子沉默背后的深度，并给予其需要的支持，而不强迫他们外向。但父母对情感的开放和直接，可能会让内省且孤傲的孩子感到不适和被侵犯了私人空间，导致他们退缩或变得更加固执己见。" },"E10": { type: "冲突型挑战", score: 20, reason: "父母的感性与孩子对逻辑和精确的追求严重冲突。父母难以理解孩子对技术世界的沉迷，而孩子则可能无法回应父母的情感需求。" },"E11": { type: "同类型共鸣", score: 90, reason: "这是另一个理想的同类型共鸣。父母和孩子都渴望情感联结，并能积极主动地建立和维护关系，形成一个充满爱和温暖的家庭氛围。然而，当出现冲突时，双方都可能因为害怕伤害关系而选择逃避或过度讨好，导致问题无法得到有效解决，最终可能演变成一场表面和谐但内部脆弱的关系。" },"E12": { type: "同类型共鸣", score: 85, reason: "父母的感性与孩子的温和相得益彰。他们都能感知彼此的情绪，尊重内省的需求，建立起一个平静、和谐、充满理解的关系。然而，父母强烈的感性表达，有时可能会让天性温和、随性的孩子感到不知所措，而孩子对冲突的逃避，也可能导致他们无法有效地与父母沟通自己的真实感受，从而将问题压抑在心底。" }},
+      "E6": {"E1": { type: "同类型共鸣", score: 90, reason: "父母与孩子都具备强大的逻辑思维能力，能互相理解并欣赏彼此对规则和效率的追求。父母可以为孩子提供更高效的思考路径，共同探索知识的深度。然而，父母爱走捷径和孩子爱面子的特质结合，可能导致双方都倾向于追求表面上的快速成功而非扎实的基础。当孩子在外面遇到挫折时，父母的“嘴碎”可能会让孩子感到更加难堪和焦虑，从而阻碍其成长。" },"E2": { type: "互补型滋养", score: 85, reason: "父母的高效思维可以帮助孩子将内心的创新想法付诸行动。父母能够理解并鼓励孩子的深度思考，同时提供将其付诸行动的框架。但双方都内敛且容易陷入负面情绪，可能会导致他们在面对困难时都选择自我消化和逃避，缺乏有效的情感沟通，最终让问题积累并爆发。" },"E3": { type: "冲突型挑战", score: 40, reason: "父母的逻辑和效率可能与孩子对权威和掌控的需求产生摩擦。双方都希望以自己的方式解决问题，可能导致持续的权力斗争。" },"E4": { type: "同类型共鸣", score: 90, reason: "父母和孩子都充满活力，热衷于探索和解决问题。父母的高效学习能力可以成为孩子创新行动的加速器，共同将想法变为现实。然而，双方都可能因为过于追求新奇和效率而忽视了基础和细节，导致做事不够严谨。父母的“嘴碎”也可能让孩子感到被挑剔或不被完全接纳，从而影响其自信心和探索热情。" },"E5": { type: "冲突型挑战", score: 20, reason: "父母的理性思维与孩子的情感需求直接冲突。父母可能会认为孩子的情绪化不合逻辑，而孩子则可能觉得父母冷漠、不近人情，情感联结受阻。" },"E6": { type: "同类型共鸣", score: 95, reason: "这是最理想的同类型匹配。父母和孩子都思维敏捷、学习高效，能够建立起一种基于智力共鸣的深层联结。他们是彼此最好的学习伙伴。然而，双方爱走捷径、嘴碎和易陷入负面情绪的特质也会相互强化。家庭氛围可能充满抱怨和负能量，当遇到问题时，双方都可能试图用聪明的诡辩来逃避责任，而不是积极地解决问题。" },"E7": { type: "同类型共鸣", score: 85, reason: "父母的高效与孩子的务实相辅相成。他们都重视结果和效率。父母可以为孩子提供高效的学习方法和资源，共同追求卓越。但这种关系可能过于强调功利性，而忽略了生活中的乐趣和情感交流，导致家庭氛围过于严肃和刻板。父母的“嘴碎”也可能让孩子感到被过度批评，从而变得更加谨小慎微。" },"E8": { type: "互补型滋养", score: 80, reason: "父母的高效学习能力可以帮助孩子更好地管理其天马行空的探索，将好奇心转化为有价值的发现和技能。但孩子对自由的强烈渴望，可能会与父母的逻辑和规划产生冲突，孩子会觉得父母试图束缚自己，而父母则觉得孩子不负责任、缺乏方向。" },"E9": { type: "同类型共鸣", score: 90, reason: "父母和孩子都重视智力探索，能够进行深入的思维交流。父母的效率可以帮助孩子将深度思考的成果高效地表达出来。然而，孩子的完美主义和固执己见，可能会与父母爱走捷径的特质产生摩擦。当父母陷入负面情绪时，孩子可能会因为不理解或无法完美解决问题而感到挫败，甚至选择孤立自己。" },"E10": { type: "同类型共鸣", score: 90, reason: "父母与孩子都具备强大的逻辑和技术专长。他们能够共同解决复杂的技术问题，形成一种高效且富有创造力的合作关系。但双方都可能过于沉迷于技术和逻辑的世界，而忽略了情感联结。父母的“嘴碎”可能会被孩子视为无意义的干扰，而父母则可能觉得孩子过于冷漠和不近人情。" },"E11": { type: "冲突型挑战", score: 15, reason: "父母的理性与孩子对情感联结的强烈需求形成巨大冲突。父母可能会将孩子的情感需求视为不重要或非理性的，导致孩子感到不被爱和理解。" },"E12": { type: "冲突型挑战", score: 30, reason: "父母的快节奏和高效追求，可能让孩子感到巨大压力。孩子温和内省的天性可能被父母的强势思维所压制，感到不适。" }},
+      "E7": {"E1": { type: "同类型共鸣", score: 85, reason: "父母的务实谨慎与孩子对系统和秩序的追求高度一致。他们都重视规划和风险控制，能够为孩子提供一个安全、可预测的成长环境。然而，父母对功利和效率的过度关注，可能会让爱面子的孩子感到巨大压力，孩子会为了满足父母的期待而变得过度谨慎，不敢犯错。" },"E2": { type: "互补型滋养", score: 75, reason: "父母的务实可以为孩子内向的创新世界提供坚实的现实基础。孩子可以安心地探索，而父母则确保其安全和稳定。但是，父母对务实的过度强调，可能会让孩子感到不被理解和情感上的疏离，从而变得更加孤僻。" },"E3": { type: "互补型滋养", score: 70, reason: "父母的谨慎可以为孩子的果断行动提供缓冲和考量，避免不必要的风险。父母为孩子提供了强大的安全网，让孩子可以更放心地去行动。然而，当孩子想要掌控全局时，父母的谨慎和保守可能会被孩子视为胆怯或缺乏魄力，从而引发冲突。" },"E4": { type: "冲突型挑战", score: 20, reason: "父母的风险规避与孩子的冒险精神形成根本性冲突。父母的行动可能被孩子视为鲁莽，而孩子的谨慎则被父母视为畏缩不前。这种关系可能导致孩子为了证明自己而做出更冒险的举动，而父母则感到极度焦虑和担忧，亲子关系紧张。" },"E5": { type: "冲突型挑战", score: 30, reason: "父母的务实可能难以理解和回应孩子丰富的情感需求。孩子可能会感到被忽视或不被重视，因为父母更看重实际的成果。孩子对情感联结的强烈渴望，可能会被父母视为不成熟或不理智，从而导致孩子情感上的匮乏得不到满足  。" },"E6": { type: "同类型共鸣", score: 85, reason: "父母和孩子都重视结果和效率。父母可以为孩子提供高效的学习方法和资源，共同追求卓越。然而，孩子爱走捷径和嘴碎的特质可能会让父母感到不踏实和不安，而父母的过度谨慎也可能让孩子感到被束缚，无法自由地运用其聪明才智。" },"E7": { type: "同类型共鸣", score: 90, reason: "这是最理想的同类型匹配。父母和孩子都高度务实且谨慎，能够建立一个安全、稳定、毫无风险的成长环境。他们能够互相理解彼此的需求。但这种关系也可能过于强调安全和稳定，双方都可能变得过于保守，从而错失很多潜在的机会。" },"E8": { type: "冲突型挑战", score: 15, reason: "父母的稳定需求与孩子对自由和变化的追求产生根本性冲突。父母的“安全”规则被孩子视为阻碍，孩子的探索精神被视为不负责任。这种持续的冲突可能会让孩子感到被压抑和不被信任，而父母则感到无法控制和管理孩子。" },"E9": { type: "互补型滋养", score: 80, reason: "父母的务实可以帮助孩子将深度思考转化为可行的实践。父母为孩子提供了将思想变为现实的桥梁。但父母对务实和成果的过度看重，可能会让内省型的孩子感到自己的思考和探索过程不被重视，从而产生挫败感。" },"E10": { type: "同类型共鸣", score: 90, reason: "父母的务实与孩子对技术精确性的追求高度契合。他们能够共同解决问题，将技术应用于实际，创造有价值的成果。然而，双方都可能过于关注结果和效率，而忽略了情感联结。当孩子遇到瓶颈时，父母可能无法提供情感上的支持，而只会从功利角度进行评价。" },"E11": { type: "冲突型挑战", score: 25, reason: "父母的功利主义与孩子对无条件情感联结的渴望产生冲突。孩子可能会觉得父母的爱是有条件的，而父母则难以理解孩子对情感的强烈需求。" },"E12": { type: "互补型滋养", score: 85, reason: "父母的务实和谨慎为孩子温和随性的天性提供了强大的安全保障。孩子可以在父母创造的稳定环境中，不受外界干扰地发展。然而，孩子温和被动的特质，可能会让父母感到焦虑，父母可能会试图用自己的方式去干预，从而打破孩子所习惯的平静和和谐。" }},
+      "E8": {"E1": { type: "冲突型挑战", score: 10, reason: "父母对自由、变化和无序的追求，与孩子对规则、秩序和稳定性的需求形成根本性冲突。孩子会因为无法维持表面上的“完美”而感到焦虑和挫败，而父母则可能觉得孩子过于保守和脆弱，难以进行深层沟通。" },"E2": { type: "互补型滋养", score: 85, reason: "父母的外向探索为孩子内心的创新世界提供了源源不断的灵感。父母可以帮助孩子将内向的想法大胆地付诸实践。然而，父母的过度活跃和对持续变化的追求，可能会让内向、需要独立空间的孩子感到压力和疲惫，无法获得足够的独处时间来消化和整理自己的想法，从而变得更加退缩。" },"E3": { type: "冲突型挑战", score: 20, reason: "父母的探索欲与孩子强烈的掌控欲正面冲突。父母会觉得被控制，而孩子则认为父母的行为难以预测且不负责任，导致双方持续的拉锯战。" },"E4": { type: "同类型共鸣", score: 90, reason: "父母和孩子都具备强大的行动力和创新精神。他们能够共同冒险，互相激发，成为彼此最好的探险伙伴。然而，这种关系也可能因为缺乏必要的边界和规则而变得混乱。双方都过于冲动和冒险，可能导致在学习或生活中缺乏规划和自律，难以将想法真正转化为有价值的成果。" },"E5": { type: "互补型滋养", score: 80, reason: "父母的自由精神能为孩子的情感世界带来无限的活力和新奇体验。父母能鼓励孩子大胆表达情感，探索更广阔的人际关系。然而，父母的“跳跃式”思维和行动，可能会让情感丰富的孩子感到情感上的不确定和被忽视。当孩子需要父母深层的情感联结时，父母可能已经转移了注意力，让孩子感到被抛弃或不被重视。" },"E6": { type: "互补型滋养", score: 85, reason: "父母的高效学习能力可以帮助孩子更好地管理其天马行空的探索，将好奇心转化为有价值的发现和技能。但孩子爱走捷径和易陷入负面情绪的特质，可能会让父母感到无法理解和引导，导致关系产生摩擦。" },"E7": { type: "冲突型挑战", score: 15, reason: "父母的冒险精神与孩子对风险的极度厌恶形成根本性冲突。父母的“探索”行为在孩子看来是鲁莽和危险的。这种关系可能导致孩子为了寻求安全感而变得更加固执和保守，甚至拒绝父母的任何新尝试。而父母则会为了孩子的“畏缩不前”而感到挫败和愤怒，难以建立信任和亲密关系。" },"E8": { type: "同类型共鸣（有挑战）", score: 60, reason: "父母与孩子都追求自由和变化，虽然能天然理解，但缺乏必要的结构和边界。双方都可能难以提供稳定的安全感，导致关系中充满不确定性。当出现问题时，双方可能都选择逃避，而不是正面解决，从而陷入无休止的循环。" },"E9": { type: "互补型滋养", score: 75, reason: "父母的外向探索可以为孩子内向的深度思考提供丰富的素材。父母能引导孩子从探索中获得更深层次的洞察和意义。然而，父母对“广度”的追求可能会让孩子感到不安，因为孩子更需要“深度”。父母可能会觉得孩子“想太多”、“行动太慢”，而孩子则觉得父母的探索是肤浅的、没有意义的，导致双方无法进行深层交流。" },"E10": { type: "互补型滋养", score: 85, reason: "父母的技术能力可以为孩子的探索精神提供强大的支持，帮助他们更好地理解和改造世界。父母能将孩子的探索变为有价值的实践。然而，父母和孩子都可能过于关注外部世界和逻辑，而忽略了情感联结。当一方遇到情感困境时，另一方可能无法提供有效的支持，从而导致关系变得机械和冷漠。" },"E11": { type: "互补型滋养", score: 80, reason: "父母的自由精神和开放态度可以帮助孩子勇敢地建立广泛的社交联结。父母能理解孩子对关系的深层需求。然而，父母的“自由”和“不羁”可能与孩子对稳定、深层情感联结的渴望产生冲突。父母可能无法长期专注于此，让孩子感到被忽略或不被完全接纳，从而影响其安全感。" },"E12": { type: "互补型滋养", score: 70, reason: "父母的活力和探索精神可以帮助孩子走出舒适区，而孩子温和内省的天性则能为父母提供平静的港湾，形成动态平衡。但父母对“过度探索”和“持续变化”的追求，可能会让追求平静和谐的孩子感到巨大的压力和不适。孩子会为了避免冲突而选择沉默或逃避，而父母则可能觉得孩子过于被动，缺乏活力，导致关系中的动态平衡被打破。" }},
+      "E9": {"E1": { type: "同类型共鸣", score: 90, reason: "父母和孩子都具备理性的内省能力，能够相互理解彼此对逻辑和结构的需求。父母的深度思考可以帮助孩子完善其系统，使其更加严谨。然而，爱面子的孩子可能会因为父母过于内向和不善社交而感到困扰，无法获得足够的外界认可，而父母也可能无法理解孩子对外部肯定的强烈需求。" },"E2": { type: "同类型共鸣", score: 95, reason: "这是最理想的同类型匹配。父母与孩子都内向，并重视深度思考和创新。他们能够建立深层的精神联结，互相理解彼此的内心世界。但这种关系也可能过于沉浸在精神和思想世界，而缺乏与现实世界的联结。双方都可能在社交和行动上变得退缩，无法将内心的想法付诸实践。" },"E3": { type: "冲突型挑战", score: 20, reason: "父母的内省与孩子的行动力形成冲突。父母的深思熟虑可能被孩子视为优柔寡断，而孩子则可能在父母面前感到被过度分析，缺乏行动空间。这种持续的拉锯战可能让孩子感到被束缚和压抑，而父母则会因为孩子的果断和冲动感到焦虑和不被尊重，关系紧张。" },"E4": { type: "互补型滋养", score: 80, reason: "父母的深度思考可以为孩子天马行空的创意提供坚实的理论基础和严密的逻辑支持，帮助其将创新想法转化为实际可行的计划。然而，父母在某些方面的固执可能会让行动力强的孩子感到不耐烦和受挫。孩子会觉得父母“太执拗”，而父母则会觉得孩子“缺根筋”，导致沟通障碍。" },"E5": { type: "互补型滋养", score: 75, reason: "父母的共情能力可以帮助孩子更好地表达内心的想法和情感。同时，孩子的情感表达也能为父母的内省世界带来温暖和活力。但父母对内省和个人空间的强烈需求，可能会让情感丰富的孩子感到情感上的疏远。当孩子需要持续的情感联结和互动时，父母的退缩可能会让孩子感到被忽视。" },"E6": { type: "同类型共鸣", score: 90, reason: "父母和孩子都重视智力探索，能够进行深入的思维交流。父母的效率可以帮助孩子将深度思考的成果高效地表达出来。然而，孩子爱走捷径和易陷入负面情绪的特质，可能会让父母感到困惑和无法理解。父母更倾向于深思熟虑，而孩子则更希望快速解决问题，这种差异可能导致彼此的节奏不一致，产生摩擦。" },"E7": { type: "同类型共鸣", score: 85, reason: "父母的深度思考与孩子的务实谨慎相辅相成。他们都重视规划和风险控制，能够共同建立一个稳定且深思熟虑的生活模式。但这种关系也可能过于谨慎和内敛，缺乏冒险精神和对新事物的探索。双方都可能陷入一种“想得多，做得少”的循环，从而错失很多潜在的机会。" },"E8": { type: "互补型滋养", score: 75, reason: "父母的内省可以为孩子外向的探索行为提供一个安静的反思空间。父母能引导孩子从探索中获得更深层次的洞察和意义。然而，父母对“深度”的追求可能会让孩子感到束缚。孩子会觉得父母过于“沉重”和“无聊”，而父母则会觉得孩子过于“肤浅”和“冲动”，难以进行深层沟通。" },"E9": { type: "同类型共鸣", score: 95, reason: "这是最完美的同类型匹配。父母和孩子都内省且擅长深度思考，能够建立起一种基于智力共鸣的深层联结，是彼此最好的精神伙伴。但这种关系也可能导致家庭氛围过于严肃和沉闷，缺乏活力和轻松感。双方都倾向于独处和思考，可能会忽视彼此的情感需求和外部的人际交往，从而变得孤立。" },"E10": { type: "互补型滋养", score: 85, reason: "父母的深度思考可以为孩子的技术专长提供更广阔的理论视野。他们能够共同将技术应用于解决更深层次、更复杂的问题。然而，这种关系也可能过于关注逻辑和技术，而忽略了情感和人际关系。孩子过于心直口快、一针见血的沟通方式，可能会让父母感到被冒犯或不被理解。当一方遇到情感困境时，另一方可能无法提供有效的支持，从而导致关系变得机械和冷漠。" },"E11": { type: "冲突型挑战", score: 25, reason: "父母的内省与孩子对深层情感联结的强烈需求形成冲突。孩子可能会觉得父母冷淡、难以靠近，而父母则可能感到孩子的情感需求过于强烈。这种关系可能让孩子感到情感上的不满足和被忽视，而父母则会感到自己的个人空间被侵犯，从而产生隔阂" },"E12": { type: "同类型共鸣", score: 90, reason: "父母和孩子都内省且温和，能够互相尊重彼此的独立空间和内心世界。这种匹配关系平静而和谐，充满理解。但是，这种和谐也可能是以牺牲行动力和创新为代价的。双方都可能过于被动和温和，难以应对外部世界的挑战，导致生活缺乏动力和激情。" }},
+      "E10": {"E1": { type: "同类型共鸣", score: 90, reason: "父母和孩子都具备强大的逻辑思维和对细节的关注。父母的技术专长能为孩子提供具体的工具和方法，帮助其构建更严谨的系统。然而，父母的心直口快可能会让爱面子的孩子感到被冒犯或不被尊重，而父母则会觉得孩子过于在意他人看法，不够直接，导致沟通效率低下。" },"E2": { type: "互补型滋养", score: 85, reason: "父母的实践能力可以帮助孩子将内心的创新想法变为现实。同时，孩子新颖的视角也能为父母的技术应用提供新的方向。然而，父母过于直截了当的说话和做事风格，可能会让孩子敏感的孩子感到不舒服，而且会一直把这种不舒服藏在心里，久而久之，孩子的身心健康容易受到影响。" },"E3": { type: "同类型共鸣", score: 80, reason: "父母与孩子都具备强大的行动力和解决问题的能力。他们能够高效地协作，共同实现目标。然而，父母的果断与孩子的掌控欲会形成冲突，双方都可能试图主导，但是双方因为过于强势而产生摩擦。" },"E4": { type: "互补型滋养", score: 90, reason: "父母的技术专长能为孩子大胆的创新提供坚实的基础和可行的实现路径。但父母过于心直口快有时会激发孩子的破坏欲，故而引发摩擦和对抗" },"E5": { type: "冲突型挑战", score: 15, reason: "父母对逻辑和效率的追求与孩子对情感联结的强烈需求完全对立。父母的心直口快和直接的解决方案，可能会让情感丰富的孩子感到情感上的忽视和伤害，觉得父母不爱自己，因此缺乏安全感。" },"E6": { type: "同类型共鸣", score: 95, reason: "这是最理想的同类型匹配。父母与孩子都具备强大的逻辑和学习能力，能够互相理解和欣赏。他们是彼此最好的智力伙伴。然而，父母的直接和孩子的嘴碎及易陷入负面情绪特质，可能导致误解和摩擦，因为他们都倾向于用逻辑而非情感来处理问题。" },"E7": { type: "同类型共鸣", score: 90, reason: "父母的技术专长能为孩子务实谨慎的天性提供具体的工具和方法，帮助其更有效地规避风险。他们是彼此最可靠的盟友。" },"E8": { type: "互补型滋养", score: 85, reason: "父母的技术能力可以为孩子的探索精神提供强大的支持，帮助他们更好地理解和改造世界。父母能将孩子的探索变为有价值的实践。但父母可能会对孩子无目的的探索感到不解，试图用目标和效率来约束他们，这会扼杀孩子的自由天性，使其感到被限制和不被理解。" },"E9": { type: "同类型共鸣", score: 90, reason: "父母的技术专长可以帮助孩子将深度思考的成果转化为实际应用。他们能够共同解决复杂的问题，将思想付诸实践。但父母的快节奏和追求效率，可能会让孩子感到不适和压力。孩子需要足够的时间进行深度思考，而父母的催促可能会打乱他们的节奏，导致他们感到焦虑和不被尊重。" },"E10": { type: "同类型共鸣", score: 95, reason: "这是最完美的同类型匹配。父母和孩子都具备技术天赋，能够建立起一种基于专业和理性的深层联结。他们能够共同成长，解决难题。但是双方都过于心直口快，所以容易引发冲突和争吵" },"E11": { type: "冲突型挑战", score: 20, reason: "父母对“物”和“事”的关注与孩子对“人”和“情”的渴望产生根本性冲突。孩子可能会感到孤独，因为父母难以满足其情感需求。父母的心直口快可能会让孩子感到受伤，感到孤独和不被爱，而父母则觉得孩子过于情绪化和脆弱。" },"E12": { type: "冲突型挑战", score: 35, reason: "父母的直接和强势可能让孩子感到巨大压力。孩子温和随性的天性可能被父母的快节奏和高要求所压制，感到不适和退缩，而父母则会觉得孩子过于被动和不思进取，产生隔阂。" }},
+      "E11": {"E1": { type: "冲突型挑战", score: 25, reason: "父母的感性联结需求与孩子对规则和秩序的理性追求直接冲突。孩子可能会觉得父母过于情绪化，而父母则可能觉得孩子缺乏情感回应，导致沟通障碍。" },"E2": { type: "互补型滋养", score: 80, reason: "父母的情感联结能力能为孩子内向的创新世界提供安全和支持。孩子可以在被爱的环境中，安心地分享自己的内心世界和新想法。然而，父母对情感的过度关注，可能会让孩子感到被情感“淹没”，觉得自己的个人空间被侵犯，渴望独处的孩子会感到压力。" },"E3": { type: "冲突型挑战", score: 15, reason: "父母的柔性联结方式与孩子强大的掌控欲正面冲突。父母可能会感到被孩子支配和忽视，而孩子则可能觉得父母的联结需求是一种软弱和束缚。" },"E4": { type: "互补型滋养", score: 85, reason: "父母的情感支持可以为孩子大胆的创新行动提供坚实的后盾。父母能成为孩子冒险旅程中温暖的港湾，帮助其在探索中保持情感平衡。然而，父母可能会过于担心孩子的安全，试图用情感来“绑架”孩子，限制他们的探索范围，这会挫伤孩子的冒险精神。" },"E5": { type: "同类型共鸣", score: 95, reason: "这是最理想的同类型匹配。父母和孩子都高度重视情感联结和人际关系。他们能够建立起极度亲密和共情的关系，彼此理解和支持。但是，双方都可能在情感上依赖彼此，缺乏独立解决问题的能力，变得过度敏感和脆弱。" },"E6": { type: "冲突型挑战", score: 20, reason: "父母对情感的强烈关注与孩子对逻辑和效率的追求直接冲突。父母可能会觉得孩子过于冷漠，而孩子则难以回应父母的情感需求，导致双方关系紧张。" },"E7": { type: "冲突型挑战", score: 30, reason: "父母的感性与孩子对务实和风险的规避形成冲突。父母可能会觉得孩子缺乏情感表达，而孩子则觉得父母过于情绪化、不理智。" },"E8": { type: "互补型滋养", score: 80, reason: "父母的情感联结能力能为孩子外向的探索行为提供稳定的情感支持。孩子可以放心地去探索，因为他们知道无论如何，父母的爱永远在。然而，父母可能会对孩子无目的的探索感到不解和担忧，试图用情感来影响孩子的选择，这会限制孩子的自由和探索精神。" },"E9": { type: "互补型滋养", score: 75, reason: "父母对情感联结的渴望可以帮助孩子更好地表达内心的想法。父母能够理解孩子沉默背后的深度，并给予其所需的爱和耐心。然而，父母可能会对孩子内敛的表达方式感到不理解，试图强迫孩子分享情感，这会侵犯孩子的个人空间，导致其退缩和隔阂。" },"E10": { type: "冲突型挑战", score: 15, reason: "父母对“人”的关注与孩子对“物”和“事”的关注产生根本性冲突。父母会觉得孩子冷漠无情，而孩子的心直口快可能会让父母感到情感上的受伤，觉得孩子难以理解自己，双方都感到孤独。" },"E11": { type: "同类型共鸣", score: 95, reason: "这是最完美的同类型匹配。父母和孩子都渴望情感联结，并能积极主动地建立和维护关系，形成一个充满爱和温暖的家庭氛围。但在遇到问题时双方都可能会过于情绪化，而难以做出理性的判断和决策" },"E12": { type: "同类型共鸣", score: 85, reason: "父母的情感联结能力与孩子温和内省的天性相得益彰。他们都能感知彼此的情绪，并以柔和的方式维系关系，是理想的同类型匹配。但是双方都可能为了避免冲突而压抑自己的真实想法，导致关系表面和谐，实则缺乏深度的坦诚交流。" }},
+      "E12": {"E1": { type: "冲突型挑战", score: 25, reason: "父母追求随性和和谐，而孩子则需要清晰的规则和结构，可能感到不被理解。孩子爱面子的特性，可能会因为父母的随性而觉得家庭没有规矩和体面，而父母则可能无法理解孩子对形式主义的追求，认为那是一种不必要的束缚。" },"E2": { type: "同类型共鸣", score: 90, reason: "父母与孩子都内向且具备深度思考能力。父母的温和可以为孩子提供一个宁静的创意空间，让他们安心地探索内心世界。然而，这种关系也可能过于内敛，双方都可能缺乏表达的冲动，导致内心世界难以被分享，情感联结变得不那么直接和外露。" },"E3": { type: "冲突型挑战", score: 15, reason: "父母的温和与孩子的强势形成根本性冲突。父母可能在孩子面前感到软弱，而孩子则会觉得父母优柔寡断，难以建立权威。孩子会试图掌控和支配，而父母则会采取退缩和顺从的姿态，导致孩子变得更加强势，而父母则感到压抑和无助。" },"E4": { type: "冲突型挑战", score: 30, reason: "父母的随性与孩子对冒险和变化的追求产生摩擦。父母可能会对孩子的冲动感到担忧，而孩子则觉得父母过于保守，缺乏活力。孩子可能会觉得父母是“绊脚石”，无法理解他们的探索欲，而父母则会因为孩子的行动力感到焦虑和不安。" },"E5": { type: "同类型共鸣", score: 90, reason: "父母与孩子都高度重视情感。父母的内省温和能够为孩子提供一个安全的表达情感的港湾，双方能够进行深层的情感交流。但这种关系也可能过于情绪化，缺乏必要的边界和理性。双方都可能在情感上依赖彼此，难以独立应对生活中的挑战，变得过度敏感。" },"E6": { type: "冲突型挑战", score: 20, reason: "父母的随性和缺乏外在驱动力，可能无法满足孩子对高效、高产出的追求。孩子可能会觉得父母无法提供足够的学习支持和目标。而孩子爱走捷径和易陷入负面情绪的特质，也让父母感到困惑，无法理解孩子为什么总是焦虑和不开心，难以提供有效的安慰。" },"E7": { type: "同类型共鸣", score: 85, reason: "父母与孩子都倾向于规避风险。父母的温和可以为孩子务实谨慎的天性提供额外的安全感，共同创造一个平静且稳定的生活环境。然而，这种关系也可能过于保守和缺乏弹性，因为双方都以稳定为核心。" },"E8": { type: "冲突型挑战", score: 20, reason: "父母的稳定需求与孩子对自由和变化的追求产生根本性冲突。父母的随性被孩子视为缺乏方向，孩子的探索被父母视为不负责任。父母可能会试图用情感来“绑架”孩子，希望孩子为了家庭的和谐而放弃探索，而孩子则会觉得父母的爱是一种束缚。" },"E9": { type: "同类型共鸣", score: 95, reason: "这是最理想的同类型匹配。父母与孩子都内省且擅长深度思考，能够建立起一种基于智力共鸣的深层联结。父母的包容也能够给与孩子足够的空间和安全感。" },"E10": { type: "冲突型挑战", score: 35, reason: "父母的温和与孩子对逻辑和精确性的追求形成冲突。父母可能难以理解孩子对技术世界的沉迷，而孩子则可能无法回应父母的情感需求。孩子的心直口快可能会让父母感到情感上的受伤，觉得自己不被理解和尊重。父母会选择退缩来避免冲突，这会让孩子觉得父母不够坦诚和直接，导致关系隔阂。" },"E11": { type: "同类型共鸣", score: 95, reason: "父母的温和可以为孩子提供一个极度安全的联结环境。他们都能感知彼此的情绪，并以柔和的方式维系关系，是理想的同类型匹配。" },"E12": { type: "同类型共鸣", score: 95, reason: "这是最完美的同类型匹配。父母和孩子都内省且温和，能够互相尊重彼此的独立空间和内心世界。这种关系平静而和谐，充满理解。但这种和谐也可能导致双方都过于被动和温和，难以应对外部世界的挑战，缺乏行动力和决策力。" }}
+    };
+
+    const traits = Array.from({ length: 12 }, (_, i) => `E${i + 1}`);
+
+    // LeanCloud 初始化配置：支持 URL 参数与本地存储
+    function readConfig() {
+      const url = new URL(window.location.href);
+      const cfg = {
+        appId: url.searchParams.get('lcAppId') || localStorage.getItem('lc_app_id') || '',
+        appKey: url.searchParams.get('lcAppKey') || localStorage.getItem('lc_app_key') || '',
+        serverURL: url.searchParams.get('lcServerURL') || localStorage.getItem('lc_server_url') || '',
+        appSlug: url.searchParams.get('appSlug') || localStorage.getItem('app_slug') || 'trait-matcher-demo'
+      };
+      return cfg;
+    }
+
+    async function initLeanCloud(cfg) {
+      if (!cfg.appId || !cfg.appKey || !cfg.serverURL) return null;
+      if (!window.AV) return null;
+      try {
+        AV.init({ appId: cfg.appId, appKey: cfg.appKey, serverURL: cfg.serverURL });
+        // 登录策略：优先匿名登录；若不可用则降级为本地随机账号
+        let user = AV.User.current();
+        if (!user) {
+          if (AV.User.logInAnonymously) {
+            user = await AV.User.logInAnonymously();
+          } else {
+            const saved = JSON.parse(localStorage.getItem('lc_demo_user') || 'null');
+            if (saved && saved.username && saved.password) {
+              try {
+                user = await AV.User.logIn(saved.username, saved.password);
+              } catch (e) {
+                // 失败则重新注册
+              }
+            }
+            if (!user) {
+              const username = 'user_' + Math.random().toString(36).slice(2);
+              const password = Math.random().toString(36).slice(2);
+              const u = new AV.User();
+              u.setUsername(username);
+              u.setPassword(password);
+              await u.signUp();
+              user = u;
+              localStorage.setItem('lc_demo_user', JSON.stringify({ username, password }));
+            }
+          }
+        }
+        return user;
+      } catch (e) {
+        console.error('LeanCloud init/login failed:', e);
+        return null;
+      }
+    }
+
+    async function getOrCreateSharedObject({ appSlug, matchId, parentTrait, childTrait }) {
+      const q = new AV.Query('TraitMatchShared');
+      q.equalTo('appSlug', appSlug);
+      q.equalTo('matchId', matchId);
+      const found = await q.first();
+      if (found) return found;
+      const obj = new AV.Object('TraitMatchShared');
+      obj.set('appSlug', appSlug);
+      obj.set('matchId', matchId);
+      obj.set('parentTrait', parentTrait);
+      obj.set('childTrait', childTrait);
+      const acl = new AV.ACL();
+      acl.setPublicReadAccess(true);
+      acl.setPublicWriteAccess(true);
+      obj.setACL(acl);
+      await obj.save();
+      return obj;
+    }
+
+    function App() {
+      const [cfg, setCfg] = useState(readConfig());
+      const [user, setUser] = useState(null);
+      const [parentTrait, setParentTrait] = useState('E1');
+      const [childTrait, setChildTrait] = useState('E1');
+      const [currentMatch, setCurrentMatch] = useState(null);
+      const [isEditing, setIsEditing] = useState(false);
+      const [loading, setLoading] = useState(false);
+      const [message, setMessage] = useState('');
+      const [isMessageVisible, setIsMessageVisible] = useState(false);
+      const liveSubRef = useRef(null);
+      const pollRef = useRef(null);
+
+      const showMessage = (text) => {
+        setMessage(text);
+        setIsMessageVisible(true);
+        setTimeout(() => setIsMessageVisible(false), 2500);
+      };
+
+      // 初始化 LeanCloud
+      useEffect(() => {
+        let cancelled = false;
+        (async () => {
+          const u = await initLeanCloud(cfg);
+          if (!cancelled) setUser(u);
+        })();
+        return () => { cancelled = true; };
+      }, [cfg.appId, cfg.appKey, cfg.serverURL]);
+
+      // 保存配置到本地存储
+      const handleSaveConfig = (e) => {
+        e.preventDefault();
+        const form = new FormData(e.currentTarget);
+        const next = {
+          appId: form.get('appId').trim(),
+          appKey: form.get('appKey').trim(),
+          serverURL: form.get('serverURL').trim(),
+          appSlug: form.get('appSlug').trim() || 'trait-matcher-demo',
+        };
+        localStorage.setItem('lc_app_id', next.appId);
+        localStorage.setItem('lc_app_key', next.appKey);
+        localStorage.setItem('lc_server_url', next.serverURL);
+        localStorage.setItem('app_slug', next.appSlug);
+        setCfg(next);
+        showMessage('配置已保存');
+      };
+
+      // 监听选择变化并加载数据（支持本地数据降级）
+      useEffect(() => {
+        const matchId = `${parentTrait}-${childTrait}`;
+        const publicData = allPublicMatches[parentTrait]?.[childTrait] || null;
+        
+        // 立即显示本地数据（降级方案）
+        if (publicData) {
+          setCurrentMatch({
+            id: null,
+            parentTrait,
+            childTrait,
+            type: publicData.type,
+            score: publicData.score,
+            reason: publicData.reason,
+            interpretation: publicData.reason
+          });
+        } else {
+          setCurrentMatch({
+            id: null,
+            parentTrait,
+            childTrait,
+            type: null,
+            score: null,
+            reason: null,
+            interpretation: '暂无此配对的解读。'
+          });
+        }
+
+        // 如果LeanCloud已配置，尝试加载共享数据
+        if (user && cfg.appId && cfg.appKey && cfg.serverURL) {
+          setLoading(true);
+          let disposed = false;
+          
+          (async () => {
+            try {
+              const obj = await getOrCreateSharedObject({ appSlug: cfg.appSlug, matchId, parentTrait, childTrait });
+              if (disposed) return;
+              
+              // 更新为共享数据
+              const overrideInterpretation = obj.get('overrideInterpretation');
+              setCurrentMatch(prev => ({
+                ...prev,
+                id: obj.id,
+                interpretation: overrideInterpretation || prev.reason || '暂无此配对的解读。'
+              }));
+
+              // 清理旧订阅/轮询
+              if (liveSubRef.current) { try { liveSubRef.current.unsubscribe(); } catch (_) {} liveSubRef.current = null; }
+              if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+
+              // LiveQuery 优先
+              if (AV.Query.prototype.subscribe) {
+                const q = new AV.Query('TraitMatchShared');
+                q.equalTo('appSlug', cfg.appSlug);
+                q.equalTo('matchId', matchId);
+                const sub = await q.subscribe();
+                liveSubRef.current = sub;
+                sub.on('update', (updated) => {
+                  const text = updated.get('overrideInterpretation');
+                  setCurrentMatch((prev) => prev ? { ...prev, interpretation: text || prev.reason } : prev);
+                });
+                sub.on('create', (created) => {
+                  const text = created.get('overrideInterpretation');
+                  setCurrentMatch((prev) => prev ? { ...prev, interpretation: text || prev.reason } : prev);
+                });
+              } else {
+                // 降级为轮询
+                pollRef.current = setInterval(async () => {
+                  try {
+                    const latest = await new AV.Query('TraitMatchShared')
+                      .equalTo('appSlug', cfg.appSlug)
+                      .equalTo('matchId', matchId)
+                      .first();
+                    if (latest) {
+                      const text = latest.get('overrideInterpretation');
+                      setCurrentMatch((prev) => prev ? { ...prev, interpretation: text || prev.reason } : prev);
+                    }
+                  } catch (e) {}
+                }, 3000);
+              }
+            } catch (e) {
+              console.error('LeanCloud加载失败，使用本地数据:', e);
+              // 保持本地数据显示，不显示错误消息
+            } finally {
+              if (!disposed) setLoading(false);
+            }
+          })();
+
+          return () => {
+            disposed = true;
+          };
+        }
+      }, [user, cfg.appId, cfg.appKey, cfg.serverURL, cfg.appSlug, parentTrait, childTrait]);
+
+      // 保存编辑
+      const handleSave = async (newText) => {
+        // 如果没有LeanCloud配置，只更新本地状态
+        if (!user || !cfg.appId || !cfg.appKey || !cfg.serverURL) {
+          setCurrentMatch(prev => prev ? { ...prev, interpretation: newText } : prev);
+          setIsEditing(false);
+          showMessage('已保存到本地（未配置LeanCloud）');
+          return;
+        }
+        
+        try {
+          const matchId = `${parentTrait}-${childTrait}`;
+          const obj = await getOrCreateSharedObject({ appSlug: cfg.appSlug, matchId, parentTrait, childTrait });
+          obj.set('overrideInterpretation', newText);
+          await obj.save();
+          setIsEditing(false);
+          showMessage('已保存到共享版本');
+        } catch (e) {
+          console.error(e);
+          showMessage('保存失败');
+        }
+      };
+
+      const shareUrl = (() => {
+        const url = new URL(location.href);
+        url.searchParams.set('lcAppId', cfg.appId || '');
+        url.searchParams.set('lcAppKey', cfg.appKey || '');
+        url.searchParams.set('lcServerURL', cfg.serverURL || '');
+        url.searchParams.set('appSlug', cfg.appSlug || 'trait-matcher-demo');
+        return url.toString();
+      })();
+
+      return (
+        <div className="min-h-screen p-6 flex flex-col items-center">
+          {/* 提示信息 */}
+          <div className={`fixed top-4 left-1/2 -translate-x-1/2 transition-opacity duration-300 ${isMessageVisible ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="bg-gray-800 text-white text-sm py-2 px-4 rounded-full shadow-md">{message}</div>
+          </div>
+
+          <header className="w-full max-w-5xl text-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">亲子特质匹配分析（LeanCloud 协作版）</h1>
+            <p className="text-gray-600">选择父母与孩子特质，查看并共同编辑解读。将分享链接发给他人即可实时协作。</p>
+            <div className="mt-3 text-sm text-gray-700">
+              当前用户ID：<span className="font-mono">{user ? user.id : '未登录/加载中'}</span>
+              {(!cfg.appId || !cfg.appKey || !cfg.serverURL) && (
+                <span className="ml-2 text-orange-600">（本地模式 - 未配置LeanCloud）</span>
+              )}
+            </div>
+          </header>
+
+          {/* 配置区 */}
+          <section className="w-full max-w-5xl bg-white p-4 rounded-lg shadow mb-6">
+            <form onSubmit={handleSaveConfig} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <input name="appId" defaultValue={cfg.appId} placeholder="LeanCloud AppID" className="p-2 border rounded" />
+              <input name="appKey" defaultValue={cfg.appKey} placeholder="LeanCloud AppKey" className="p-2 border rounded" />
+              <input name="serverURL" defaultValue={cfg.serverURL} placeholder="LeanCloud ServerURL" className="p-2 border rounded" />
+              <input name="appSlug" defaultValue={cfg.appSlug} placeholder="应用标识（协作命名空间）" className="p-2 border rounded" />
+              <div className="md:col-span-4 flex gap-3">
+                <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">保存配置</button>
+                <a href={shareUrl} target="_blank" rel="noreferrer" className="bg-gray-700 text-white px-4 py-2 rounded">复制/打开分享链接</a>
+              </div>
+            </form>
+          </section>
+
+          <main className="w-full max-w-5xl bg-white p-6 rounded-xl shadow-lg flex flex-col lg:flex-row gap-8">
+            {/* 选择区 */}
+            <div className="w-full lg:w-1/3 flex flex-col space-y-6">
+              <div className="flex flex-col">
+                <label className="text-lg font-semibold text-gray-800 mb-2">父母特质</label>
+                <select value={parentTrait} onChange={e => setParentTrait(e.target.value)} className="p-3 rounded-lg border bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  {traits.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col">
+                <label className="text-lg font-semibold text-gray-800 mb-2">孩子特质</label>
+                <select value={childTrait} onChange={e => setChildTrait(e.target.value)} className="p-3 rounded-lg border bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  {traits.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* 展示区 */}
+            <div className="w-full lg:w-2/3">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center lg:text-left">匹配解读：{parentTrait} - {childTrait}</h2>
+              {loading ? (
+                <div className="flex justify-center items-center h-48">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200 shadow-inner">
+                  {currentMatch?.type && (
+                    <p className="text-sm text-gray-600 mb-1"><span className="font-semibold text-gray-800">类型:</span> {currentMatch.type}</p>
+                  )}
+                  {currentMatch?.score != null && (
+                    <p className="text-sm text-gray-600 mb-4"><span className="font-semibold text-gray-800">匹配分数:</span> {currentMatch.score}</p>
+                  )}
+                  <p className="text-gray-700 whitespace-pre-wrap">{currentMatch?.interpretation || currentMatch?.reason || '暂无内容'}</p>
+                </div>
+              )}
+              <div className="mt-6 text-center lg:text-left">
+                <button 
+                  onClick={() => setIsEditing(true)} 
+                  className="bg-blue-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:bg-blue-700 transition-colors duration-200 transform hover:scale-105"
+                >
+                  编辑此解读
+                  {(!cfg.appId || !cfg.appKey || !cfg.serverURL) && (
+                    <span className="ml-2 text-xs">（本地模式）</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </main>
+
+          {/* 编辑弹窗 */}
+          {isEditing && currentMatch && (
+            <EditModal initialText={currentMatch.interpretation} onCancel={() => setIsEditing(false)} onSave={handleSave} parentTrait={parentTrait} childTrait={childTrait} />
+          )}
+        </div>
+      );
+    }
+
+    function EditModal({ initialText, onSave, onCancel, parentTrait, childTrait }) {
+      const [text, setText] = useState(initialText || '');
+      const submit = (e) => { e.preventDefault(); onSave(text); };
+      return (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-8 shadow-2xl w-full max-w-lg">
+            <h2 className="text-2xl font-bold mb-4 text-gray-800">编辑：父母{parentTrait} - 孩子{childTrait}</h2>
+            <form onSubmit={submit}>
+              <div className="mb-6">
+                <textarea value={text} onChange={e => setText(e.target.value)} rows="10" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-3"></textarea>
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button type="button" onClick={onCancel} className="bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-full hover:bg-gray-400 transition-colors">取消</button>
+                <button type="submit" className="bg-blue-600 text-white font-semibold py-2 px-6 rounded-full hover:bg-blue-700 transition-colors">保存</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
+
+
