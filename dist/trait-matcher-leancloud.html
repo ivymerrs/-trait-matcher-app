@@ -63,7 +63,7 @@
         if (!user) {
           try {
             // 尝试匿名登录
-            user = await AV.User.logInAnonymously();
+            user = await AV.User.loginAnonymously();
           } catch (e) {
             console.log('匿名登录失败，尝试用户名密码登录:', e);
             // 匿名登录失败，尝试用户名密码登录
