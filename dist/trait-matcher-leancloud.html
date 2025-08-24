@@ -61,14 +61,18 @@
         // 登录策略：优先匿名登录；若不可用则降级为本地随机账号
         let user = AV.User.current();
         if (!user) {
-          if (AV.User.logInAnonymously) {
+          try {
+            // 尝试匿名登录
             user = await AV.User.logInAnonymously();
-          } else {
+          } catch (e) {
+            console.log('匿名登录失败，尝试用户名密码登录:', e);
+            // 匿名登录失败，尝试用户名密码登录
             const saved = JSON.parse(localStorage.getItem('lc_demo_user') || 'null');
             if (saved && saved.username && saved.password) {
               try {
                 user = await AV.User.logIn(saved.username, saved.password);
               } catch (e) {
+                console.log('保存的用户登录失败，创建新用户:', e);
                 // 失败则重新注册
               }
             }
