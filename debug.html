@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeanCloud 配置调试</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .status { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+    .error { background-color: #ffebee; border-color: #f44336; }
+    .success { background-color: #e8f5e8; border-color: #4caf50; }
+    .warning { background-color: #fff3e0; border-color: #ff9800; }
+    button { margin: 5px; padding: 10px 15px; }
+  </style>
+</head>
+<body>
+  <h1>LeanCloud 配置调试</h1>
+  
+  <div id="basic-status" class="status">
+    <h2>基本状态</h2>
+    <p>页面加载时间: <span id="load-time"></span></p>
+    <p>localStorage 支持: <span id="localStorage-support"></span></p>
+  </div>
+  
+  <div id="config-status" class="status">
+    <h2>配置状态</h2>
+    <div id="config-content">加载中...</div>
+  </div>
+  
+  <div id="leancloud-status" class="status">
+    <h2>LeanCloud 状态</h2>
+    <div id="leancloud-content">检查中...</div>
+  </div>
+  
+  <div>
+    <button onclick="checkAll()">刷新所有状态</button>
+    <button onclick="clearAll()">清除所有配置</button>
+    <button onclick="testLocalStorage()">测试 localStorage</button>
+  </div>
+  
+  <script>
+    function checkBasicStatus() {
+      document.getElementById('load-time').textContent = new Date().toLocaleString();
+      document.getElementById('localStorage-support').textContent = 
+        typeof(Storage) !== "undefined" ? "支持" : "不支持";
+    }
+    
+    function checkConfig() {
+      const configDiv = document.getElementById('config-content');
+      try {
+        const cfg = {
+          appId: localStorage.getItem('lc_app_id') || '',
+          appKey: localStorage.getItem('lc_app_key') || '',
+          serverURL: localStorage.getItem('lc_server_url') || '',
+          appSlug: localStorage.getItem('app_slug') || 'trait-matcher-demo'
+        };
+        
+        const isComplete = cfg.appId && cfg.appKey && cfg.serverURL;
+        
+        configDiv.innerHTML = `
+          <p><strong>AppID:</strong> ${cfg.appId || '未设置'}</p>
+          <p><strong>AppKey:</strong> ${cfg.appKey || '未设置'}</p>
+          <p><strong>ServerURL:</strong> ${cfg.serverURL || '未设置'}</p>
+          <p><strong>AppSlug:</strong> ${cfg.appSlug}</p>
+          <p><strong>配置完整:</strong> <span style="color: ${isComplete ? 'green' : 'red'}">${isComplete ? '是' : '否'}</span></p>
+        `;
+        
+        document.getElementById('config-status').className = 
+          'status ' + (isComplete ? 'success' : 'warning');
+          
+      } catch (error) {
+        configDiv.innerHTML = `<p class="error">读取配置失败: ${error.message}</p>`;
+        document.getElementById('config-status').className = 'status error';
+      }
+    }
+    
+    function checkLeanCloud() {
+      const leancloudDiv = document.getElementById('leancloud-content');
+      
+      if (typeof AV === 'undefined') {
+        leancloudDiv.innerHTML = '<p>LeanCloud SDK 未加载</p>';
+        document.getElementById('leancloud-status').className = 'status warning';
+        return;
+      }
+      
+      try {
+        const cfg = {
+          appId: localStorage.getItem('lc_app_id') || '',
+          appKey: localStorage.getItem('lc_app_key') || '',
+          serverURL: localStorage.getItem('lc_server_url') || ''
+        };
+        
+        if (!cfg.appId || !cfg.appKey || !cfg.serverURL) {
+          leancloudDiv.innerHTML = '<p>配置不完整，跳过 LeanCloud 初始化</p>';
+          document.getElementById('leancloud-status').className = 'status warning';
+          return;
+        }
+        
+        AV.init({ 
+          appId: cfg.appId, 
+          appKey: cfg.appKey, 
+          serverURL: cfg.serverURL 
+        });
+        
+        leancloudDiv.innerHTML = '<p><strong>初始化:</strong> 成功</p>';
+        document.getElementById('leancloud-status').className = 'status success';
+        
+      } catch (error) {
+        leancloudDiv.innerHTML = `<p class="error"><strong>初始化失败:</strong> ${error.message}</p>`;
+        document.getElementById('leancloud-status').className = 'status error';
+      }
+    }
+    
+    function testLocalStorage() {
+      try {
+        localStorage.setItem('test_key', 'test_value');
+        const value = localStorage.getItem('test_key');
+        localStorage.removeItem('test_key');
+        
+        if (value === 'test_value') {
+          alert('localStorage 工作正常！');
+        } else {
+          alert('localStorage 测试失败！');
+        }
+      } catch (error) {
+        alert('localStorage 测试失败: ' + error.message);
+      }
+    }
+    
+    function clearAll() {
+      try {
+        localStorage.removeItem('lc_app_id');
+        localStorage.removeItem('lc_app_key');
+        localStorage.removeItem('lc_server_url');
+        localStorage.removeItem('app_slug');
+        alert('配置已清除！');
+        checkAll();
+      } catch (error) {
+        alert('清除配置失败: ' + error.message);
+      }
+    }
+    
+    function checkAll() {
+      checkBasicStatus();
+      checkConfig();
+      checkLeanCloud();
+    }
+    
+    window.addEventListener('load', function() {
+      console.log('调试页面加载完成');
+      checkAll();
+    });
+  </script>
+</body>
+</html>
