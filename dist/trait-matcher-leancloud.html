@@ -45,9 +45,9 @@
     function readConfig() {
       const url = new URL(window.location.href);
       const cfg = {
-        appId: url.searchParams.get('lcAppId') || localStorage.getItem('lc_app_id') || '',
-        appKey: url.searchParams.get('lcAppKey') || localStorage.getItem('lc_app_key') || '',
-        serverURL: url.searchParams.get('lcServerURL') || localStorage.getItem('lc_server_url') || '',
+        appId: url.searchParams.get('lcAppId') || localStorage.getItem('lc_app_id') || 'GQ9BHMpGHNFWHQCGBGxQRqO0-gzGzoHsz',
+        appKey: url.searchParams.get('lcAppKey') || localStorage.getItem('lc_app_key') || 'DwZPWV6NEvqpjzmmtTyeD4i4',
+        serverURL: url.searchParams.get('lcServerURL') || localStorage.getItem('lc_server_url') || 'https://gq9bhmpg.lc-cn-n1-shared.com',
         appSlug: url.searchParams.get('appSlug') || localStorage.getItem('app_slug') || 'trait-matcher-demo'
       };
       return cfg;
